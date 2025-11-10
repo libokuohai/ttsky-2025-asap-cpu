@@ -179,7 +179,7 @@ parameter OP_LDI = 4'b0101;
 parameter OP_JMP = 4'b0110;
 parameter OP_JC  = 4'b0111;
 parameter OP_JZ  = 4'b1000;
-parameter OP_STI = 4'b1001;
+//parameter OP_STI = 4'b1001;
 parameter OP_OUT = 4'b1110;
 parameter OP_HLT = 4'b1111;
 
@@ -206,8 +206,6 @@ always @(negedge clk) begin
 	else if (ir[7:4] == OP_ADD && stage == 2)
 		ctrl_mi <= 1;
 	else if (ir[7:4] == OP_SUB && stage == 2)
-		ctrl_mi <= 1;
-	else if (ir[7:4] == OP_STA && stage == 2)
 		ctrl_mi <= 1;
 	else if (ir[7:4] == OP_STA && stage == 2)
 		ctrl_mi <= 1;
