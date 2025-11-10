@@ -52,6 +52,18 @@ module tt_um_libokuohai_asap_cpu_v1 (
     // -----------------------------
     // Binary to BCD (3 digits), 7-seg encoding
     // -----------------------------
+    reg [7:0] out_sync1, out_sync2;
+    always @(posedge scan_clk or posedge reset) begin
+        if (reset) begin
+            out_sync1 <= 8'h00;
+            out_sync2 <= 8'h00;
+        end else begin
+            out_sync1 <= out;         // sample async bus from cpu domain
+            out_sync2 <= out_sync1;   // metastability hardening
+        end
+    end
+
+    wire [7:0] out_scan = out_sync2;
     wire [11:0] bcd;
     bin_to_bcd u_b2d (.bin(out), .bcd(bcd));
 
