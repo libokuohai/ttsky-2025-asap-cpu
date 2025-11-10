@@ -29,7 +29,7 @@ module tb ();
 `endif
 
   // Instantiate YOUR TinyTapeout top module:
-  tt_um_lbkh_asap_cpu_v1 user_project (
+  tt_um_libokuohai_asap_cpu_v1 user_project (
 
 `ifdef GL_TEST
       .VPWR   (VPWR),
