@@ -93,20 +93,31 @@ async def test_heartbeat_toggles(dut):
     """uo_out[7] is the heartbeat (divided clock) and should toggle eventually."""
     await start_clk_and_reset(dut)
 
-    hb0 = (int(dut.uo_out.value) >> 7) & 1
+    # helper: read a single bit safely, returning None if X/Z
+    def read_bit(sig, idx):
+        bit = sig.value[idx]          # cocotb Logic
+        return int(bit) if bit.is_resolvable else None
 
-    # Heartbeat = clk/2^19 with current RTL taps; with 10 MHz sim clock it's ~19 Hz.
-    # Check across a few windows to catch at least one toggle.
+    hb0 = read_bit(dut.uo_out, 7)
+    # if it was X right after reset, wait a tick
+    while hb0 is None:
+        await ClockCycles(dut.clk, 1)
+        hb0 = read_bit(dut.uo_out, 7)
+
     toggled = False
+    # With div[18] and 10 MHz sim, one toggle ~ 2^19 / 10e6 ≈ 52.4 ms.
+    # Check across a few windows to catch at least one edge.
     for _ in range(3):
         await ClockCycles(dut.clk, 200_000)  # 20 ms per window at 10 MHz
-        hb1 = (int(dut.uo_out.value) >> 7) & 1
+        hb1 = read_bit(dut.uo_out, 7)
+        if hb1 is None:
+            continue
         if hb1 != hb0:
             toggled = True
+            hb0 = hb1
             break
 
-    assert toggled, "Heartbeat (uo_out[7]) did not toggle within the expected observation window."
-
+    assert toggled, "Heartbeat (uo_out[7]) did not toggle within the expected window."
 
 @cocotb.test()
 async def test_manual_reset_ui0(dut):
