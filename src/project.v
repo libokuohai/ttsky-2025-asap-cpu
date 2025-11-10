@@ -20,6 +20,7 @@ module tt_um_libokuohai_asap_cpu_v1 (
     // Clock divide (slow CPU + scan)
     // -----------------------------
     reg [23:0] div;
+    wire reset = (~rst_n) | ui_in[0];
     always @(posedge clk or posedge reset) begin
         if (reset)
             div <= 24'd0;
@@ -36,7 +37,7 @@ module tt_um_libokuohai_asap_cpu_v1 (
     // Reset (SAP-1 expects active-high)
     // ui_in[0] can be a manual reset (optional)
     // -----------------------------
-    wire reset = (~rst_n) | ui_in[0];
+    
 
     // -----------------------------
     // SAP-1 core
@@ -120,25 +121,17 @@ module bin_to_bcd(
     input wire[7:0] bin,
     output reg[11:0] bcd);
 
-integer i;
+    integer i;
 
-always @(bin) begin
-    bcd = 0;
-
-    for (i = 0; i < 8; i = i+1) begin
-        if (bcd[3:0] > 4)
-            bcd[3:0] = bcd[3:0] + 3;
-
-        if (bcd[7:4] > 4)
-            bcd[7:4] = bcd[7:4] + 3;
-
-        if (bcd[11:8] > 4)
-            bcd[11:8] = bcd[11:8] + 3;
-
-        // Concatenate acts as a shift
-        bcd = {bcd[10:0], bin[7-i]};
+    always @* begin
+        bcd = 12'd0;
+        for (i = 0; i < 8; i = i+1) begin
+            if (bcd[3:0]  > 4) bcd[3:0]  = bcd[3:0]  + 3;
+            if (bcd[7:4]  > 4) bcd[7:4]  = bcd[7:4]  + 3;
+            if (bcd[11:8] > 4) bcd[11:8] = bcd[11:8] + 3;
+            bcd = {bcd[10:0], bin[7-i]};
+        end
     end
-end
 
 endmodule
 
