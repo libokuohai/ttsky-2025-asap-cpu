@@ -5,7 +5,7 @@
 
 `default_nettype none
 
-module tt_um_example (
+module tt_um_lbkh_asap_cpu_v1 (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
     input  wire [7:0] uio_in,   // IOs: Input path
@@ -17,77 +17,120 @@ module tt_um_example (
 );
 
   // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+  //assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
+  //assign uio_out = 0;
+  //assign uio_oe  = 0;
 
   // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+  //wire _unused = &{ena, clk, rst_n, 1'b0};
+
+//endmodule
+
+//module top(
+//	input CLK,
+//	input PIN_13,
+//	output PIN_9,
+//	output PIN_10, output PIN_11,
+//	output PIN_12, output PIN_14,
+//	output PIN_15, output PIN_16,
+//	output PIN_17, output PIN_18,
+//	output PIN_19, output PIN_20);
+
+    // -----------------------------
+    // Clock divide (slow CPU + scan)
+    // -----------------------------
+    reg [23:0] div;
+    always @(posedge clk) begin
+        div <= div + 24'd1;
+    end
+    wire cpu_clk  = div[18]; // slow enough to watch numbers change
+    wire scan_clk = div[10]; // faster digit scan
+
+    // -----------------------------
+    // Reset (SAP-1 expects active-high)
+    // ui_in[0] can be a manual reset (optional)
+    // -----------------------------
+    wire reset = (~rst_n) | ui_in[0];
+
+    // -----------------------------
+    // SAP-1 core
+    // -----------------------------
+    wire [7:0] out;
+    cpu cpu0(
+        .clk   (cpu_clk),
+        .reset (reset),
+        .out   (out)
+    );
+
+    // -----------------------------
+    // Binary to BCD (3 digits), 7-seg encoding
+    // -----------------------------
+    wire [11:0] bcd;
+    bin_to_bcd u_b2d (.bin(out), .bcd(bcd));
+
+    wire [6:0] seg_ones;
+    wire [6:0] seg_tens;
+    wire [6:0] seg_hundreds;
+
+    seven_seg u_ones     (.bcd(bcd[3:0]),   .segments(seg_ones));
+    seven_seg u_tens     (.bcd(bcd[7:4]),   .segments(seg_tens));
+    seven_seg u_hundreds (.bcd(bcd[11:8]),  .segments(seg_hundreds));
+
+    // -----------------------------
+    // Scan three digits (active-low "cathode" enables)
+    // -----------------------------
+    reg  [3:0] cathode = 4'b1110; // D0 on first
+    reg  [6:0] seg_cur;
+
+    always @(posedge scan_clk or posedge reset) begin
+        if (reset) begin
+            cathode <= 4'b1110;
+            seg_cur <= 7'b0000000;
+        end else begin
+            case (cathode)
+                4'b1110: begin
+                    cathode <= 4'b1011;     // next digit
+                    seg_cur <= seg_hundreds;
+                end
+                4'b1011: begin
+                    cathode <= 4'b1101;
+                    seg_cur <= seg_tens;
+                end
+                4'b1101: begin
+                    cathode <= 4'b1110;
+                    seg_cur <= seg_ones;
+                end
+                default: begin
+                    cathode <= 4'b1111;     // all off
+                    seg_cur <= 7'b0000000;
+                end
+            endcase
+        end
+    end
+
+	// -----------------------------
+    // Pin mapping to TinyTapeout
+    // -----------------------------
+    // uo_out[6:0] = 7-seg segments (A..G), active-high like your original
+    // uo_out[7]   = heartbeat (optional)
+    assign uo_out[6:0] = seg_cur;
+    assign uo_out[7]   = cpu_clk;
+
+    // Put the 4 digit enable lines on bidirectional IO and drive them
+    assign uio_out[3:0] = cathode;   // active-low digit enables
+    assign uio_out[7:4] = 4'b0000;
+
+    assign uio_oe[3:0]  = 4'b1111;   // drive these 4 pins out
+    assign uio_oe[7:4]  = 4'b0000;   // leave the rest as inputs
+
+    // -----------------------------
+    // Silence unused warnings
+    // -----------------------------
+    wire _unused = &{ena, uio_in, ui_in[7:1], 1'b0};
 
 endmodule
 
-module top(
-	input CLK,
-	input PIN_13,
-	output PIN_9,
-	output PIN_10, output PIN_11,
-	output PIN_12, output PIN_14,
-	output PIN_15, output PIN_16,
-	output PIN_17, output PIN_18,
-	output PIN_19, output PIN_20);
-
-reg[7:0] out;
-reg[23:0] clk;
-always @(posedge CLK)
-	clk <= clk + 1;
-
-cpu cpu0(
-	.clk(clk[18]),
-	.reset(PIN_13),
-	.out(out));
-
-reg[3:0] cathode = 4'b1110;
-reg[6:0] seg_ones;
-reg[6:0] seg_tens;
-reg[6:0] seg_hundreds;
-wire[11:0] bcd;
-
-bin_to_bcd bin_to_bcd0(out, bcd);
-
-seven_seg seven_seg_ones(
-	.bcd(bcd[3:0]),
-	.segments(seg_ones));
-
-seven_seg seven_seg_tens(
-	.bcd(bcd[7:4]),
-	.segments(seg_tens));
-
-seven_seg seven_seg_hundreds(
-	.bcd(bcd[11:8]),
-	.segments(seg_hundreds));
-
-always @(posedge clk[10])
-	case (cathode)
-		4'b1110: begin
-			cathode = 4'b1011;
-			{PIN_11, PIN_9, PIN_15, PIN_18, PIN_19, PIN_10, PIN_14} = seg_hundreds;
-		end
-		4'b1011: begin
-			cathode = 4'b1101;
-			{PIN_11, PIN_9, PIN_15, PIN_18, PIN_19, PIN_10, PIN_14} = seg_tens;
-		end
-		4'b1101: begin
-			cathode = 4'b1110;
-			{PIN_11, PIN_9, PIN_15, PIN_18, PIN_19, PIN_10, PIN_14} = seg_ones;
-		end
-		default: begin
-			cathode = 4'b1111;
-		end
-	endcase
-
-assign {PIN_20, PIN_17, PIN_16, PIN_12} = cathode;
-
-endmodule
+`default_nettype wire
 
 module bin_to_bcd(
 	input wire[7:0] bin,
