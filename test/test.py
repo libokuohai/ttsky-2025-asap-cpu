@@ -140,3 +140,57 @@ async def test_manual_reset_ui0(dut):
         await ClockCycles(dut.clk, 1)
 
     assert saw_init, "Did not observe uio_out[3:0]==1110 after manual reset (ui[0])."
+
+# Map 7-seg patterns (A..G active-high) to decimal digits
+SEG_TO_DIGIT = {
+    0b1111110: 0,
+    0b0110000: 1,
+    0b1101101: 2,
+    0b1111001: 3,
+    0b0110011: 4,
+    0b1011011: 5,
+    0b1011111: 6,
+    0b1110000: 7,
+    0b1111111: 8,
+    0b1110011: 9,
+}
+
+def _read_bit_safe(sig, idx):
+    bit = sig.value[idx]
+    return int(bit) if bit.is_resolvable else None
+
+def _read_u7_safe(sig):
+    try:
+        return int(sig.value) & 0x7F
+    except Exception:
+        return None
+
+async def _capture_display_once(dut, max_cycles=10000):
+    """
+    Sample until we’ve captured the three digits from the scan:
+      uio_out[3:0] == 0b1011 -> hundreds
+      uio_out[3:0] == 0b1101 -> tens
+      uio_out[3:0] == 0b1110 -> ones
+    Returns a tuple (hundreds, tens, ones) or None if not all captured.
+    """
+    digits = {"hundreds": None, "tens": None, "ones": None}
+
+    for _ in range(max_cycles):
+        en = int(dut.uio_out.value) & 0xF
+        seg = _read_u7_safe(dut.uo_out)
+        if seg is not None and seg in SEG_TO_DIGIT:
+            d = SEG_TO_DIGIT[seg]
+            if en == 0b1011:
+                digits["hundreds"] = d
+            elif en == 0b1101:
+                digits["tens"] = d
+            elif en == 0b1110:
+                digits["ones"] = d
+
+            if all(v is not None for v in digits.values()):
+                return (digits["hundreds"], digits["tens"], digits["ones"])
+
+        await ClockCycles(dut.clk, 1)
+
+    return None
+
