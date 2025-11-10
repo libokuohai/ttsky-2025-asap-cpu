@@ -114,8 +114,6 @@ module tt_um_libokuohai_asap_cpu_v1 (
 
 endmodule
 
-`default_nettype wire
-
 module bin_to_bcd(
 	input wire[7:0] bin,
 	output reg[11:0] bcd);
@@ -385,15 +383,18 @@ end
 ///////////////////////////////////////////////////////////////////////////////
 // Bus
 ///////////////////////////////////////////////////////////////////////////////
+wire [7:0] bus;
+wire [7:0] pc_zext = {4'b0000, pc};
+wire [7:0] ir_zext = {4'b0000, ir[3:0]};
+wire [7:0] alu_lo  = alu[7:0];
 
-wire[7:0] bus;
 assign bus =
-	ctrl_co ? pc :
-	ctrl_ro ? mem[mar] :
-	ctrl_io ? ir[3:0] :
-	ctrl_ao ? a_reg :
-	ctrl_eo ? alu :
-	8'b0;
+    ctrl_co ? pc_zext :
+    ctrl_ro ? mem[mar] :
+    ctrl_io ? ir_zext :
+    ctrl_ao ? a_reg :
+    ctrl_eo ? alu_lo :
+    8'h00;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Program Counter
