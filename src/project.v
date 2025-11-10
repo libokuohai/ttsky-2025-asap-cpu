@@ -65,7 +65,7 @@ module tt_um_libokuohai_asap_cpu_v1 (
 
     wire [7:0] out_scan = out_sync2;
     wire [11:0] bcd;
-    bin_to_bcd u_b2d (.bin(out), .bcd(bcd));
+    bin_to_bcd u_b2d (.bin(out_scan), .bcd(bcd));
 
     wire [6:0] seg_ones;
     wire [6:0] seg_tens;
